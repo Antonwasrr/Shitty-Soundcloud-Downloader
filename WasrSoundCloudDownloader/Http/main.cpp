@@ -23,7 +23,6 @@ int main() {
 
     const wchar_t* finalInp = tmp.c_str();
 
-    // Open a connection to example.com using HTTPS
     hConnect = InternetOpenUrl(hInternet, finalInp, NULL, 0, INTERNET_FLAG_RELOAD, 0);
     if (hConnect == NULL) {
         std::cerr << "InternetOpenUrl failed: " << GetLastError() << std::endl;
@@ -31,7 +30,6 @@ int main() {
         return 1;
     }
 
-    // Read and print the response
     char* buffer = new char[1000096];
 
     DWORD bytesRead;
