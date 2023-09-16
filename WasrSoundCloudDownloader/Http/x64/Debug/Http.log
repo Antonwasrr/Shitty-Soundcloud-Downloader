@@ -1,0 +1,3 @@
+﻿  main.cpp
+C:\Users\johan\source\repos\Http\Http\main.cpp(215,75): warning C4267: 'argument': conversion from 'size_t' to 'DWORD', possible loss of data
+  Http.vcxproj -> C:\Users\johan\source\repos\Http\x64\Debug\WasrSoundCloudDownloader.exe
