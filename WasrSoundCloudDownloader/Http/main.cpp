@@ -2,12 +2,27 @@
 #include <windows.h>
 #include <wininet.h>
 #include <fstream>
+#include <regex>
+
+std::string findPattern(std::string bufferText, std::string pattern, std::string untill) {
+    const char* patternC = pattern.c_str();
+    size_t startPos2 = bufferText.find(pattern);
+    if (startPos2 != std::string::npos) {
+        startPos2 += strlen(patternC);
+        size_t endPos2 = bufferText.find(untill, startPos2);
+        if (endPos2 != std::string::npos) {
+            return bufferText.substr(startPos2, endPos2 - startPos2);
+        }
+    }
+    return "";
+}
+
 
 int main() {
     HINTERNET hInternet, hConnect;
 
     // Initialize WinINet
-    hInternet = InternetOpen(L"HTTP Request", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    hInternet = InternetOpen("HTTP Request", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (hInternet == NULL) {
         std::cerr << "InternetOpen failed: " << GetLastError() << std::endl;
         return 1;
@@ -19,9 +34,8 @@ int main() {
     std::cout << "Soundcloud downloader(Input url): ";
     std::cin >> input;
 
-    std::wstring tmp = std::wstring(input.begin(), input.end());
 
-    const wchar_t* finalInp = tmp.c_str();
+    const char* finalInp = input.c_str();
 
     hConnect = InternetOpenUrl(hInternet, finalInp, NULL, 0, INTERNET_FLAG_RELOAD, 0);
     if (hConnect == NULL) {
@@ -30,45 +44,91 @@ int main() {
         return 1;
     }
 
-    char* buffer = new char[1000096];
+    char* buffer = new char[138900];
 
     DWORD bytesRead;
-    std::string responseText;
+    std::string beginUrl;
 
     bool foundName = false;
     std::string Name;
 
     std::string bufferText;
 
+    std::string trackAuth;
+
+    std::string clientID;
+
     while (InternetReadFile(hConnect, buffer, sizeof(buffer), &bytesRead) && bytesRead > 0) {
         bufferText.append(buffer, bytesRead);
     }
   
-    size_t startPos = bufferText.find("Users who like ");
-    if (startPos != std::string::npos) {
-        startPos += strlen("Users who like ");
-        size_t endPos = bufferText.find("<", startPos);
-        if (endPos != std::string::npos) {
-            Name = bufferText.substr(startPos, endPos - startPos);            
+    Name = findPattern(bufferText, "Users who like ", "<");
+
+    beginUrl = findPattern(bufferText, "\"transcodings\":[{\"url\":\"", "\"");
+
+    trackAuth = findPattern(bufferText, "\"track_authorization\":\"", "\"");
+
+    const char* clietnUrl;
+
+
+    std::regex urlPattern(R"((https?://[^\s'"]+))");
+
+    std::sregex_iterator it(bufferText.begin(), bufferText.end(), urlPattern);
+    std::sregex_iterator end;
+
+    std::string lastURL;
+    std::string secondLastURL;
+
+    while (it != end) {
+        secondLastURL = lastURL;
+        lastURL = it->str();
+        ++it;
+    }
+
+    if (!lastURL.empty()) {
+        if (!secondLastURL.empty()) {
+
+        }
+        else {
+            std::cout << "Client url not found" << std::endl;
         }
     }
-    
-    size_t startPos2 = bufferText.find("{\"url\":\"");
-    if (startPos2 != std::string::npos) {
-        startPos2 += strlen("{\"url\":\"");
-        size_t endPos2 = bufferText.find("\"", startPos2);
-        if (endPos2 != std::string::npos) {
-            responseText = bufferText.substr(startPos2, endPos2 - startPos2);
-        }
+    else {
+        std::cout << "Client url not found" << std::endl;
     }
     
+    clietnUrl = secondLastURL.c_str();
+
+    hConnect = InternetOpenUrl(hInternet, clietnUrl, NULL, 0, INTERNET_FLAG_RELOAD, 0);
+    if (hConnect == NULL) {
+        std::cerr << "InternetOpenUrl failed: " << GetLastError() << std::endl;
+        InternetCloseHandle(hInternet);
+        return 1;
+    }
+    std::string bufferText2;
+
+    char* clientBuffer = new char[138900];
+
+    DWORD bytesReadC;
+
+    while (InternetReadFile(hConnect, clientBuffer, sizeof(clientBuffer), &bytesReadC) && bytesReadC > 0) {
+        bufferText2.append(clientBuffer, bytesReadC);
+    }
+
+    clientID = findPattern(bufferText2, "client_id:\"", "\"");
+
     std::cout << "Downloading: " << Name << "\n";
 
-    responseText += "?client_id=mCI5A0SvhgnQwDCWuCWhd27qNEoeQvoG&track_authorization=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW8iOiJTRSIsInN1YiI6IjEyMDE4MzY2NzYiLCJyaWQiOiI1MWNkYjNmZS0yMzVjLTQ0NTItYWM3MS1kNWQwMTRkMzcwYzYiLCJpYXQiOjE2OTQwMzY0MjR9.bFgQgdzSZxBqoMYCn8A1eIoyUGyX-t7CUCMqY0JSZEw";
+    beginUrl += "?client_id=";
 
-    std::wstring stemp = std::wstring(responseText.begin(), responseText.end());
+    beginUrl += clientID;
 
-    LPCWSTR sw = stemp.c_str();
+    beginUrl += "&track_authorization=";
+
+    beginUrl += trackAuth;
+
+    const char* sw = beginUrl.c_str();
+
 
     hConnect = InternetOpenUrl(hInternet, sw, NULL, 0, INTERNET_FLAG_RELOAD, 0);
     if (hConnect == NULL) {
@@ -77,7 +137,14 @@ int main() {
         return 1;
     }
 
-    char buffer2[4096];
+
+    // To get beggining of link search: "transcodings":[{"url": " untill another "
+    // To get auth search: "track_authorization": " untill another "
+    // to get client id get request to second to last link in response of the song url
+    // search for client_id:" untill another "
+
+
+    char* buffer2 = new char[53890]; // long songs
     DWORD bytesRead2;
     std::string rText2;
     bool foundColon = false;
@@ -103,9 +170,9 @@ int main() {
         }
     }
 
-    std::wstring stemp2 = std::wstring(rText2.begin(), rText2.end());
 
-    LPCWSTR sw2 = stemp2.c_str();
+
+    const char* sw2 = rText2.c_str();
    
     hConnect = InternetOpenUrl(hInternet, sw2, NULL, 0, INTERNET_FLAG_RELOAD, 0);
     if (hConnect == NULL) {
@@ -154,20 +221,17 @@ int main() {
     char bufferA[bufferSize];
     std::string audioData;
 
-    // Iterate through the URLs in downloadTable and download audio data
     for (int i = 0; i < downloadTableIndex; ++i) {
-        // Open a connection to the current URL using HTTPS
-        std::wstring stemp3 = std::wstring(downloadTable[i].begin(), downloadTable[i].end());
+        std::string stemp3 = std::string(downloadTable[i].begin(), downloadTable[i].end());
 
-        LPCWSTR url = stemp3.c_str();
+        LPCSTR url = stemp3.c_str();
 
         hConnect = InternetOpenUrl(hInternet, url, NULL, 0, INTERNET_FLAG_RELOAD, 0);
         if (hConnect == NULL) {
             std::cerr << "InternetOpenUrl failed for URL " << i + 1 << ": " << GetLastError() << std::endl;
-            continue; // Skip to the next URL if this one fails
+            continue;
         }
 
-        // Read and append audio data from the current URL to the bufferA
         while (InternetReadFile(hConnect, bufferA, bufferSize, &bytesRead) && bytesRead > 0) {
             audioData.append(bufferA, bytesRead);
         }
@@ -175,7 +239,7 @@ int main() {
         InternetCloseHandle(hConnect);
     }
 
-    WCHAR exePath[MAX_PATH];
+    CHAR exePath[MAX_PATH];
     GetModuleFileName(NULL, exePath, MAX_PATH);
 
     std::string result;
@@ -197,15 +261,12 @@ int main() {
 
     Name = result;
 
-    // Modify the path to include the desired file name
-    std::wstring filePath(exePath);
-    size_t lastBackslash = filePath.find_last_of(L"\\");
+    std::string filePath(exePath);
+    size_t lastBackslash = filePath.find_last_of("\\");
     Name += ".mp3";
-    std::wstring tmp2 = std::wstring(Name.begin(), Name.end());
-    const wchar_t* finalInp2 = tmp2.c_str();
-    filePath = filePath.substr(0, lastBackslash + 1) + finalInp2;
 
-    // Save the combined audio data to a file in the program's folder
+    filePath = filePath.substr(0, lastBackslash + 1) + Name;
+
     HANDLE hFile = CreateFile(filePath.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) {
         DWORD error = GetLastError();
@@ -215,7 +276,7 @@ int main() {
             NULL,
             error,
             0,
-            (LPWSTR)&errorMessage,
+            (LPSTR)&errorMessage,
             0,
             NULL
         );
@@ -228,15 +289,11 @@ int main() {
 
     Name.erase(Name.size() - 4);
 
-    std::wstring tmp3 = std::wstring(Name.begin(), Name.end());
-
-    std::wcout << tmp3 << ": " << filePath << std::endl;
+    std::cout << Name << ": " << filePath << "\n";
 
 
 
 
-
-    // Clean up
     InternetCloseHandle(hConnect);
     InternetCloseHandle(hInternet);
 
