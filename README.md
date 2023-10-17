@@ -7,3 +7,5 @@ Navigate to Configuration Properties > General.
 Change the value of the Character Set property to Use Multi-byte Character Set.
 
 Then compile using release and run
+
+If you want you can download the pre compiled version in the releases tab
